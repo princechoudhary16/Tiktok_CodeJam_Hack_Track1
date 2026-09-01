@@ -1,251 +1,98 @@
-# Volc Agent Launchpad
+# Tiktok CodeJam — Hack Track 1
 
-A minimal Agent platform for three-day middleware hackathons. It provides Agent
-CRUD, a browser Playground, persistent workspaces, and Codex CLI backed by the
-Volcengine Ark Responses API.
+## Project Overview
+Agent Launchpad: a self-healing middleware for agent runs. This repo contains the CodeJam submission implementing a middleware layer that observes agent executions, classifies failures, and performs automated recovery actions while preserving auditability and operator control.
 
-Run it locally with Docker, Colima, or rootless Podman, or deploy it to
-Volcengine ECS.
+## What it does
+- Observes run telemetry and captures inputs, outputs, environment snapshots, and errors.
+- Detects failure classes (transient infra, resource limits, bad inputs, hallucinations) using rules and lightweight models.
+- Recovers automatically using composable handlers (retry/backoff, environment reset, prompt sanitization, model fallback).
+- Learns which remedies work and adapts policies.
+- Surfaces audit trails and escalates unrecoverable cases.
 
-> [!WARNING]
-> This is a single-user proof of concept. It intentionally has no identity,
-> tracing, audit, or hardened sandbox middleware. Do not use production data or
-> credentials. See [SECURITY.md](SECURITY.md).
+## Architecture
+- `server/`: middleware service (runner integrations, recovery handlers, policies).
+- `web/`: minimal UI for run inspection and policy controls.
+- `deploy/`: terraform and templates for deploying to cloud (example configs).
+- `scripts/`: helper scripts for local bootstrap and deployment.
 
-## Screenshots
+Integration points:
+- Runner: the middleware sits between orchestrator and agent runner via HTTP/gRPC adapter.
+- Model providers: supports fallback to alternative LLM endpoints when needed.
+- Observability: structured logs and traces (OpenTelemetry-compatible) for replay and debugging.
 
-### Agent Playground
+## How we built it
+- Pragmatic stack: TypeScript/Node for the middleware and web UI, containerized for portability.
+- Instrumentation: per-run metadata capture, structured logs, and traces.
+- Failure classification: rule-based heuristics with a small ML classifier trained on historical runs.
+- Recovery handlers: modular functions that apply a safe change and record outcomes.
 
-![Agent Playground showing lifecycle controls, starter prompts, and the Codex Runtime](docs/assets/playground.jpg)
+## Key files and folders
+- `server/src/` — core middleware and handlers.
+- `web/src/` — React + Vite UI to inspect runs.
+- `deploy/` — example cloud deployment templates.
+- `scripts/bootstrap-local.sh` — local bootstrap steps.
 
-### Create an Agent
+## Running locally
+Prereqs: Node.js (18+), Docker (optional), git
 
-![Create Agent form with name, description, and workspace instructions](docs/assets/create-agent.jpg)
-
-## Features
-
-- React and TypeScript Web UI
-- Agent create, edit, start, stop, delete, and multi-turn chat
-- Fastify control plane with asynchronous Run state
-- Persistent Agent workspaces and Codex sessions
-- Disposable Docker, Colima, or Podman container for each local turn
-- Docker and Terraform deployment paths for Volcengine ECS
-
-## Requirements
-
-- Node.js 22+
-- npm 10+
-- Docker, Colima, or Podman
-- A Volcengine Ark API key and endpoint that supports the Responses API
-
-Codex CLI is included in the Runtime image and is not required on the host.
-
-## Local browser SOP
-
-### 1. Check the local tools
-
-Install Node.js 22+ and one supported container engine, then verify them:
+1. Install dependencies:
 
 ```bash
-node --version
-npm --version
-docker --version        # Docker Desktop, Docker Engine, or Colima
-podman --version        # Use this instead when running Podman
+cd server
+npm install
+cd ../web
+npm install
 ```
 
-Only one container engine is required. Codex CLI is already included in the
-Runtime image.
-
-### 2. Clone the repository
+2. Run server locally (development):
 
 ```bash
-git clone <repository-url> volc-agent-launchpad
-cd volc-agent-launchpad
+cd server
+npm run dev
 ```
 
-Skip this step when already working from the repository root.
-
-### 3. Start the POC
+3. Run web UI:
 
 ```bash
-ARK_API_KEY=your-ark-api-key \
-ARK_MODEL=ep-your-endpoint-id \
-npm run poc
+cd web
+npm run dev
 ```
 
-The first run installs Node.js dependencies and builds the Runtime image. The
-script automatically selects Docker, Colima, or Podman.
-
-### 4. Open the browser
-
-Visit <http://localhost:3000>, or open it from the terminal:
-
-```bash
-open http://localhost:3000       # macOS
-xdg-open http://localhost:3000   # Linux desktop
-```
-
-In the Web UI:
-
-1. Select **Create Agent**.
-2. Enter a name, description, and workspace instructions.
-3. Select **Create Agent** again.
-4. Enter a task in the Playground, for example:
-
-   ```text
-   Create a TypeScript hello-world CLI, add a test, and run it.
-   ```
-
-The Agent can write files, run commands, and continue the same Codex session in
-later messages.
-
-### 5. Stop and resume
-
-Press `Ctrl+C` in the startup terminal. The script removes temporary Runtime
-containers but keeps Agent workspaces and conversations.
-
-- macOS state: `~/.volc-agent-launchpad/`
-- Linux state: `.local/`
-- Custom location: set `LOCAL_POC_DATA_ROOT`
-
-Run the same `npm run poc` command to continue later.
-
-### Select a specific container engine
-
-Force Podman when multiple engines are installed:
-
-```bash
-CONTAINER_ENGINE=podman \
-ARK_API_KEY=your-ark-api-key \
-ARK_MODEL=ep-your-endpoint-id \
-npm run poc
-```
-
-Colima uses `CONTAINER_ENGINE=docker` because it exposes the Docker CLI.
-
-For a clean Linux host, follow the
-[rootless Podman setup](docs/LOCAL_POC.md#rootless-podman-on-linux).
-
-## Docker Compose
-
-Create and edit the configuration:
+4. Bootstrap local runner (uses Docker):
 
 ```bash
 ./scripts/bootstrap-local.sh
 ```
 
-Required values in `.env`:
+## Tests
+- Unit tests are in `server/src` and can be run with `npm test` in the server folder.
 
-```dotenv
-ARK_API_KEY=your-ark-api-key
-ARK_MODEL=ep-your-endpoint-id
-APP_AUTH_TOKEN=replace-with-at-least-24-random-characters
-```
+## How integration works (details)
+1. Orchestrator sends run requests to middleware adapter.
+2. Middleware records request metadata and forwards to runner.
+3. Runner executes agent; middleware tails logs and metrics.
+4. If error occurs, middleware classifies and selects a handler.
+5. Handler performs a safe recovery action and retries or escalates.
+6. All actions are recorded for audit and feedback into learning heuristics.
 
-Start the application:
-
-```bash
-docker compose up --build
-```
-
-Open <http://localhost:3000>. Stop it without deleting Agent data:
-
-```bash
-docker compose down
-```
-
-## Development
-
-```bash
-npm install
-cp .env.example .env
-npm install --global @openai/codex@0.111.0
-npm run dev
-```
-
-- Web UI: <http://localhost:5173>
-- API: <http://localhost:3000>
-
-Use local paths in `.env` when running outside Docker:
-
-```dotenv
-APP_DATA_DIR=.data
-AGENT_WORKSPACE_ROOT=workspaces
-CODEX_HOME=codex-home
-```
+## Extending the system
+- Add new recovery handlers under `server/src/handlers` as small, idempotent functions.
+- Add instrumentation updates when introducing new runners or environments.
+- Policy tuning: policies are stored in `server/config/policies` and can be changed per workspace.
 
 ## Deployment
+- Build images with `docker build` in `server` and `web` directories.
+- Example `docker-compose.yml` is at project root for local integration.
+- For cloud, see `deploy/volcengine` for example Terraform templates.
 
-- [Existing Linux ECS with Docker](docs/DEPLOYMENT.md#existing-linux-ecs)
-- [Complete Volcengine environment with Terraform](docs/DEPLOYMENT.md#terraform-deployment)
-- [Local Docker, Colima, and Podman details](docs/LOCAL_POC.md)
-
-The existing-ECS script deploys from the current source tree:
-
-```bash
-cp .env.example .env.production
-./scripts/deploy-existing-ecs.sh .env.production
-```
-
-The Terraform path provisions VPC, subnet, security group, ECS, and EIP:
-
-```bash
-cp deploy/volcengine/terraform.tfvars.example \
-  deploy/volcengine/terraform.tfvars
-./scripts/deploy-volcengine.sh
-```
-
-## Configuration
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `ARK_API_KEY` | Required | Ark model API key. |
-| `ARK_MODEL` | Required | Responses-capable endpoint or model ID. |
-| `ARK_BASE_URL` | Beijing v3 endpoint | Ark OpenAI-compatible API URL. |
-| `APP_AUTH_TOKEN` | Empty on loopback | Shared demo token; use 24+ random characters remotely. |
-| `RUNTIME_PROVIDER` | `local-process` | `container` for disposable local Runtime containers. |
-| `CODEX_SANDBOX_MODE` | `workspace-write` | Codex inner sandbox mode. |
-| `CODEX_TIMEOUT_MS` | `600000` | Maximum duration of one turn. |
-| `LOCAL_POC_DATA_ROOT` | Platform-specific | Local metadata, workspace, and session directory. |
-
-See [.env.example](.env.example) for all Runtime and resource-limit options.
-
-## How it works
-
-```mermaid
-flowchart LR
-    UI["React Web UI"] --> API["Fastify control plane"]
-    API --> Store["JSON metadata and Agent workspaces"]
-    API --> Runtime{"Runtime provider"}
-    Runtime -->|Local POC| Container["Disposable Docker / Colima / Podman container"]
-    Runtime -->|ECS profile| Codex["Codex CLI in application container"]
-    Container --> Ark["Volcengine Ark Responses API"]
-    Codex --> Ark
-```
-
-The first turn uses `codex exec`; later turns resume the stored Codex thread.
-Deleting an Agent archives its workspace under `workspaces/.deleted/`.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for component and extension
-boundaries.
-
-## Validation
-
-```bash
-npm run check
-terraform fmt -check -recursive deploy/volcengine
-docker compose config
-```
-
-## Documentation
-
-- [Architecture](docs/ARCHITECTURE.md)
-- [Local POC](docs/LOCAL_POC.md)
-- [Deployment](docs/DEPLOYMENT.md)
-- [Hackathon extension guide](docs/HACKATHON_EXTENSION_GUIDE.md)
-- [Security policy](SECURITY.md)
-- [Contributing](CONTRIBUTING.md)
+## Contributions
+- Please open pull requests against this fork. Maintain small, focused changes and include tests for new handlers.
 
 ## License
+See `LICENSE` at project root.
 
-[MIT](LICENSE)
+## Contact
+Project maintainers: Prince Choudhary (repo owner)
+
+README generated for the Devpost submission and repo distribution.
