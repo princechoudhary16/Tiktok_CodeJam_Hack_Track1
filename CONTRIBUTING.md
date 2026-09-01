@@ -1,7 +1,5 @@
 # Contributing
-
-Keep changes focused, reproducible, and suitable for a three-day student
-hackathon.
+Change the Env variables and model by placing the original key and number. The current ones are dummy.
 
 ## Setup
 
