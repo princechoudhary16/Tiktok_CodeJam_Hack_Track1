@@ -1,0 +1,17 @@
+Intro:
+Hi, I'm Prince Choudhary. This demo shows Agent Launchpad — a middleware that detects and heals agent run failures automatically while keeping full auditability.
+
+Repo overview:
+The codebase is organized into `server`, `web`, and `deploy`. Built with TypeScript, Node, React, and Docker. The middleware observes runs, classifies failures, and applies safe recovery handlers.
+
+Demo narration (successful run):
+This run completed normally. Notice captured inputs, outputs, timings and trace links for debugging. The middleware stores telemetry for replay.
+
+Demo narration (failure + recovery):
+This run intentionally fails. The middleware detects the failure, classifies it as a simulated runtime error, selects a recovery handler, applies a workspace restore and retries automatically. The audit trail shows actions taken and final outcome.
+
+Policies:
+Operators can tune policy aggressiveness and set manual approval gates per workspace. Changes are recorded and reversible.
+
+Close:
+Thanks for watching. The repository and media links are in the README.

@@ -96,3 +96,25 @@ See `LICENSE` at project root.
 Project maintainers: Prince Choudhary (repo owner)
 
 README generated for the Devpost submission and repo distribution.
+ 
+## Media and Demo
+Media assets (screenshots, transcript, and demo scripts) are available under `docs/media` and `scripts/`:
+
+- `docs/media/` — place screenshots and thumbnail here before publishing.
+- `docs/media/transcript.txt` — demo narration transcript.
+- `scripts/demo-success.sh` — reproducible successful-run demo.
+- `scripts/demo-failure.sh` — reproducible failing-run demo exercising recovery handlers.
+
+To run the demos locally:
+
+```bash
+cd /path/to/project
+npm install
+# open a terminal and run a demo (server will be started and stopped by the script)
+bash scripts/demo-success.sh
+# or
+bash scripts/demo-failure.sh
+```
+
+Please crop or blur any sensitive data in screenshots before uploading.
+
